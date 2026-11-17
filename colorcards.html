@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Selector Test - idx / tableRow</title>
+<style>
+  body { font-family: "Segoe UI", Meiryo, sans-serif; margin: 24px; background: #f6f7f9; color: #222; }
+  h1 { font-size: 1.4em; margin: 0 0 4px; }
+  h2 { font-size: 1.1em; margin: 0 0 8px; }
+  p.note { margin: 0 0 12px; font-size: .9em; color: #555; }
+  section { background: #fff; border: 1px solid #dde1e6; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+
+  /* 全ボタン・全入力欄に同じクラス → class でも区別できない */
+  .ib { width: 36px; height: 36px; border: 1px solid #b8c0cc; border-radius: 6px; background: #fff; cursor: pointer;
+        display: inline-flex; align-items: center; justify-content: center; margin: 4px; padding: 0; }
+  .ib:hover { background: #eef4ff; }
+  .ib svg { width: 18px; height: 18px; pointer-events: none; }
+  .ib.on { background: #d6f5d6; border-color: #3a9a3a; }
+  .tx { width: 140px; padding: 6px; margin: 4px; border: 1px solid #b8c0cc; border-radius: 4px; }
+
+  table.grid { border-collapse: collapse; }
+  table.grid th, table.grid td { border: 1px solid #ccd3dc; padding: 4px 8px; text-align: center; }
+  table.grid th { background: #eef1f5; font-weight: 600; }
+
+  .cards { display: flex; flex-wrap: wrap; gap: 8px; }
+  .card { width: 110px; height: 80px; border: 1px solid #ccd3dc; border-radius: 6px; display: flex;
+          flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+          background: #fafbfc; cursor: pointer; user-select: none; }
+  /* 色の丸は疑似要素で描画（テキストを持たないので aaname には影響させない） */
+  .card::before { content: ""; width: 20px; height: 20px; border-radius: 50%; }
+  .card.red::before    { background: #e74c3c; }
+  .card.blue::before   { background: #3498db; }
+  .card.green::before  { background: #2ecc71; }
+  .card.yellow::before { background: #f1c40f; }
+  .card.purple::before { background: #9b59b6; }
+  .card.orange::before { background: #e67e22; }
+
+  .tool { padding: 6px 14px; margin-right: 8px; cursor: pointer; }
+  #log { background: #1e1e1e; color: #b5f5b5; padding: 10px; border-radius: 6px; height: 180px; overflow-y: auto;
+         font-family: Consolas, monospace; font-size: .85em; white-space: pre-wrap; margin: 0; }
+</style>
+</head>
+<body>
+
+<h1>UiPath セレクタ検証ページ</h1>
+<p class="note">aaname が取れず、idx や tableRow / tableCol で特定することになる画面要素の検証用ページです。テスト対象には id・name・title・aria-label・placeholder・label・表示テキストを付けていません。B〜D はクラス名もすべて共通です。A だけは class に色名が入っていて、class で区別できます。</p>
+
+<!-- A: 色付きカード（class に色名） -->
+<section>
+  <h2>A. 色付きカード（class で区別）</h2>
+  <p class="note">表示テキストのない div カードです。aaname は空ですが、class に色名（red / blue / green / yellow / purple / orange）が入っています。UI Explorer で idx の代わりに class を選び直すと、シャッフルしても同じカードを選べる想定です。クリックで選択状態が切り替わります。</p>
+  <div class="cards"></div>
+</section>
+
+<!-- B: テキストのないアイコンボタン（同一構造の繰り返し） -->
+<section>
+  <h2>B. アイコンだけのボタン（idx で区別）</h2>
+  <p class="note">テキストのない同じ形のボタンが8個並んでいます。位置（idx）でしか区別できません。</p>
+  <div class="row-a"></div>
+</section>
+
+<!-- C: テーブル内の要素 -->
+<section>
+  <h2>C. テーブル内の入力欄・チェックボックス・ボタン（tableRow / tableCol で区別）</h2>
+  <p class="note">各行に同じ要素が並んでいます。行番号・列番号で位置を指定する想定です。</p>
+  <table class="grid">
+    <thead>
+      <tr><th>No</th><th>コード</th><th>選択</th><th>数量</th><th>操作</th></tr>
+    </thead>
+    <tbody class="tb"></tbody>
+  </table>
+</section>
+
+<!-- D: ラベルのないテキストボックス -->
+<section>
+  <h2>D. ラベルのないテキストボックス（idx で区別）</h2>
+  <p class="note">ラベル・placeholder・name のない入力欄が5個並んでいます。</p>
+  <div class="row-c"></div>
+</section>
+
+<!-- 操作パネル -->
+<section>
+  <h2>操作ログ</h2>
+  <p class="note">どの要素が操作されたかを表示します。「並び順シャッフル」を押すと A・B・D の並び順が変わり、idx に依存したセレクタが別の要素を指すことを確認できます。</p>
+  <button class="tool" type="button" onclick="shuffleAll()">並び順シャッフル</button>
+  <button class="tool" type="button" onclick="resetAll()">初期状態に戻す</button>
+  <button class="tool" type="button" onclick="dumpValues()">入力値を表示</button>
+  <pre id="log"></pre>
+</section>
+
+<script>
+  // 要素の論理名は DOM 属性に入れず JS 側（WeakMap）にだけ持たせる → セレクタに使える属性を増やさない
+  const label = new WeakMap();
+
+  const ICONS = [
+    '<path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14" fill="none" stroke="#333" stroke-width="2"/>',          // ゴミ箱
+    '<path d="M4 20h4L20 8l-4-4L4 16z" fill="none" stroke="#333" stroke-width="2"/>',                       // 鉛筆
+    '<circle cx="11" cy="11" r="6" fill="none" stroke="#333" stroke-width="2"/><path d="M16 16l5 5" stroke="#333" stroke-width="2"/>', // 虫眼鏡
+    '<path d="M12 5v14M5 12h14" stroke="#333" stroke-width="2"/>'                                            // プラス
+  ];
+  const SVG = i => '<svg viewBox="0 0 24 24" focusable="false">' + ICONS[i % ICONS.length] + '</svg>';
+
+  function log(msg) {
+    const el = document.getElementById('log');
+    const t = new Date().toLocaleTimeString('ja-JP');
+    el.textContent += '[' + t + '] ' + msg + '\n';
+    el.scrollTop = el.scrollHeight;
+  }
+
+  function mkIconButton(iconIdx, name) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'ib';
+    b.innerHTML = SVG(iconIdx);
+    label.set(b, name);
+    b.addEventListener('click', () => {
+      b.classList.toggle('on');
+      log(label.get(b) + ' がクリックされました（' + (b.classList.contains('on') ? 'ON' : 'OFF') + '）');
+    });
+    return b;
+  }
+
+  function build() {
+    // B: 同じアイコンを8個（アイコン種類は2種類だけ → 見た目でも区別しにくい）
+    const a = document.querySelector('.row-a');
+    a.innerHTML = '';
+    for (let i = 1; i <= 8; i++) a.appendChild(mkIconButton(i % 2, 'B-ボタン' + i));
+
+    // C: テーブル 6行
+    const tb = document.querySelector('.tb');
+    tb.innerHTML = '';
+    for (let r = 1; r <= 6; r++) {
+      const tr = document.createElement('tr');
+
+      const tdNo = document.createElement('td');
+      tdNo.textContent = r;
+      tr.appendChild(tdNo);
+
+      const tdCode = document.createElement('td');
+      tdCode.textContent = 'P-' + String(1000 + Math.floor(Math.random() * 9000)); // 毎回変わる値
+      tr.appendChild(tdCode);
+
+      const tdChk = document.createElement('td');
+      const chk = document.createElement('input');
+      chk.type = 'checkbox';
+      label.set(chk, 'C-' + r + '行目チェック');
+      chk.addEventListener('change', () => log(label.get(chk) + ' = ' + (chk.checked ? 'ON' : 'OFF')));
+      tdChk.appendChild(chk);
+      tr.appendChild(tdChk);
+
+      const tdQty = document.createElement('td');
+      const qty = document.createElement('input');
+      qty.type = 'text';
+      qty.className = 'tx';
+      qty.style.width = '70px';
+      label.set(qty, 'C-' + r + '行目数量');
+      qty.addEventListener('change', () => log(label.get(qty) + ' に "' + qty.value + '" が入力されました'));
+      tdQty.appendChild(qty);
+      tr.appendChild(tdQty);
+
+      const tdOp = document.createElement('td');
+      tdOp.appendChild(mkIconButton(1, 'C-' + r + '行目 編集ボタン'));
+      tdOp.appendChild(mkIconButton(0, 'C-' + r + '行目 削除ボタン'));
+      tr.appendChild(tdOp);
+
+      tb.appendChild(tr);
+    }
+
+    // D: ラベルなしテキストボックス 5個
+    const c = document.querySelector('.row-c');
+    c.innerHTML = '';
+    for (let i = 1; i <= 5; i++) {
+      const t = document.createElement('input');
+      t.type = 'text';
+      t.className = 'tx';
+      label.set(t, 'D-テキスト' + i);
+      t.addEventListener('change', () => log(label.get(t) + ' に "' + t.value + '" が入力されました'));
+      c.appendChild(t);
+    }
+
+    // A: 色付き div カード 6枚（表示テキストなし、class に色名）
+    // class に色名を入れる（表示テキストなし → aaname は空、class で区別する想定）
+    const cardsDef = ['red', 'blue', 'green', 'yellow', 'purple', 'orange'];
+    const d = document.querySelector('.cards');
+    d.innerHTML = '';
+    cardsDef.forEach(name => {
+      const card = document.createElement('div');
+      card.className = 'card ' + name;
+      label.set(card, 'A-カード「' + name + '」');
+      card.addEventListener('click', () => {
+        const sel = card.style.outline !== '';
+        card.style.outline = sel ? '' : '3px solid #333';
+        log(label.get(card) + ' が' + (sel ? '選択解除' : '選択') + 'されました');
+      });
+      d.appendChild(card);
+    });
+  }
+
+  function shuffleChildren(parent) {
+    const kids = Array.from(parent.children);
+    for (let i = kids.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [kids[i], kids[j]] = [kids[j], kids[i]];
+    }
+    kids.forEach(k => parent.appendChild(k));
+  }
+
+  function shuffleAll() {
+    ['.row-a', '.row-c', '.cards'].forEach(s => shuffleChildren(document.querySelector(s)));
+    log('A・B・D の並び順をシャッフルしました');
+  }
+
+  function resetAll() {
+    build();
+    log('初期状態に戻しました');
+  }
+
+  function dumpValues() {
+    const vals = [];
+    document.querySelectorAll('input').forEach(el => {
+      const v = el.type === 'checkbox' ? (el.checked ? 'ON' : 'OFF') : (el.value || '(空)');
+      vals.push(label.get(el) + ': ' + v);
+    });
+    log('入力値\n  ' + vals.join('\n  '));
+  }
+
+  build();
+  log('ページを読み込みました');
+</script>
+</body>
+</html>
