@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Selector Test - class</title>
+<title>Selector Test - aria-label</title>
 <style>
   body { font-family: "Segoe UI", Meiryo, sans-serif; margin: 24px; background: #f6f7f9; color: #222; }
   h1 { font-size: 1.4em; margin: 0 0 4px; }
@@ -33,9 +33,9 @@
 
 <h1>UiPath セレクタ検証ページ</h1>
 
-<!-- A: 色付きカード（class に色名） -->
+<!-- A: 色付きカード（aria-label に色名） -->
 <section>
-  <h2>A. 色付きカード（class で区別）</h2>
+  <h2>A. 色付きカード（aria-label で区別）</h2>
   <p class="note"></p>
   <div class="cards"></div>
 </section>
@@ -61,14 +61,16 @@
   }
 
   function build() {
-    // A: 色付き div カード 6枚（表示テキストなし → aaname は空、class に色名を入れて区別する想定）
-    const cardsDef = ['red', 'blue', 'green', 'yellow', 'purple', 'orange'];
+    // A: 色付き div カード 6枚（表示テキストなし → aria-label に色名を入れて区別する想定。class は見た目用）
+    const cardsDef = [['red', '赤'], ['blue', '青'], ['green', '緑'], ['yellow', '黄'], ['purple', '紫'], ['orange', 'オレンジ']];
     const d = document.querySelector('.cards');
     d.innerHTML = '';
-    cardsDef.forEach(name => {
+    cardsDef.forEach(([name, jp]) => {
       const card = document.createElement('div');
       card.className = 'card ' + name;
-      label.set(card, 'A-カード「' + name + '」');
+      card.setAttribute('role', 'button');
+      card.setAttribute('aria-label', jp + 'のカード');
+      label.set(card, 'A-カード「' + jp + '」');
       card.addEventListener('click', () => {
         const sel = card.style.outline !== '';
         card.style.outline = sel ? '' : '3px solid #333';
